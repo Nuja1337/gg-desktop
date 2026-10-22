@@ -1,45 +1,46 @@
 # Guild Golem desktop app
 
-A small desktop companion for [Guild Golem](https://guildgolem.com), the WoW Forever guild companion. **On hold**
-(Oct 20): the site's browser tab does its first jobs today, live logging and, later, the addon's Sync. Nothing is
-built yet; this is the plan.
+A small desktop app for [Guild Golem](https://guildgolem.com), a guild management site for WoW Forever.
 
-## What it's for
+**On hold.** For now, the site does these jobs in a browser tab: live logging today, and syncing with the addon
+later. Nothing is built yet. This is the plan.
 
-Everything the browser tab can do, without a tab kept open, and what a page can't:
+## What it would do
 
-| Feature | What it gives a raider |
+It would do what the browser tab does without a tab left open, plus a few things a web page can't:
+
+| Feature | What it means for a raider |
 |---|---|
-| Hands-free live logs | The addon turns combat logging on when you enter a raid; the app sees WoWCombatLog.txt grow and sends each pull to the guild's report, with no tab to keep open |
-| No more paste strings | It writes the night's plan into the addon's saved file before you log in, and reads attendance, loot and the bank from it after you log out |
-| Characters always current | Gear, talents and professions read from the addon's file at logout, until Forever has an API |
-| Log housekeeping | Combat logs grow to gigabytes; it archives or clears them once uploaded, after asking |
-| Kill screenshots | Offers the screenshot taken at a boss kill for the report |
-| Alerts and a tray icon | Raid countdown, invites starting, sign-up reminders, and answering from the tray |
+| Hands-free live logs | The addon turns combat logging on when you enter a raid. The app sees WoWCombatLog.txt grow and sends each pull to the guild's report |
+| No copying and pasting | It writes the night's plan into the addon's saved file before you log in, and reads attendance, loot and the bank from it after you log out |
+| Characters kept current | It reads gear, talents and professions from the addon's file when you log out, until Forever has an API for them |
+| Log cleanup | Combat logs grow to gigabytes. Once a log is uploaded, it can archive or delete it, after asking |
+| Kill screenshots | It offers the screenshot taken at a boss kill for the report |
+| Alerts in the tray | Raid countdowns, invites starting, sign-up reminders, and answering from the tray |
 | Addon installs and updates | One click |
-| Uploads that survive drops | Picks up again after a lost connection |
+| Uploads that survive a dropped connection | It picks up where it stopped |
 
 ## Limits
 
-It only ever reads and writes files: the combat log, the addon's saved variables, screenshots. Reading the game's
-memory, automating input or drawing over the game would break Blizzard's rules, and it never does any of them.
+It only reads and writes files: the combat log, the addon's saved variables and screenshots. Reading the game's
+memory, automating input or drawing over the game would break Blizzard's rules, and it won't do any of those.
 
 ## How it talks to the site
 
-Through the same public API the browser tab uses for uploads and live logs, signed in with the player's Guild Golem
-account (Discord). It keeps no copy of a log once it's sent.
+It uses the same API the browser tab uses for uploads and live logs, signed in with the player's Guild Golem account
+(through Discord). It doesn't keep a copy of a log after sending it.
 
-## Costs to plan for
+## Costs
 
-- Windows code signing, about $10 a month, or Windows warns people off installing it.
-- Apple's developer account, $99 a year, if it runs on a Mac.
-- Updates and support as the game client changes.
+- Windows code signing, about $10 a month. Without it, Windows warns people not to install the app.
+- An Apple developer account, $99 a year, for a Mac version.
+- Time for updates and support as the game client changes.
 
-## Open choices
+## Still to decide
 
-- Tauri (small, Rust) or Electron (larger, all JavaScript).
+- Tauri (small, written in Rust) or Electron (larger, all JavaScript).
 - Windows first, or Windows and Mac together.
 
 ## Licence
 
-None yet: all rights reserved.
+There's no licence yet, so all rights are reserved.
