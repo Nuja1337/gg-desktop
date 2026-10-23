@@ -2,12 +2,15 @@
 
 A small desktop app for [Guild Golem](https://guildgolem.com), a guild management site for WoW Forever.
 
-**On hold.** For now, the site does these jobs in a browser tab: live logging today, and syncing with the addon
-later. Nothing is built yet. This is the plan.
+**On hold.** For now, the site does live logging in a browser tab, and plans to sync with the addon there too. Both
+need the browser to keep one of the game's files open. Chrome and Edge refuse that for any file under Program Files,
+where Battle.net installs the game by default, so the tab works only when the game is installed somewhere else. For a
+default install, this app would be the way to do both. Nothing is built yet. This is the plan.
 
 ## What it would do
 
-It would do what the browser tab does without a tab left open, plus a few things a web page can't:
+It would do what the browser tab does, without a tab left open and wherever the game is installed, plus a few things
+a web page can't:
 
 | Feature | What it means for a raider |
 |---|---|
