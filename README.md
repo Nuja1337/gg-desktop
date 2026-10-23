@@ -2,10 +2,14 @@
 
 A small desktop app for [Guild Golem](https://guildgolem.com), a guild management site for WoW Forever.
 
-**On hold.** For now, the site does live logging in a browser tab, and plans to sync with the addon there too. Both
-need the browser to keep one of the game's files open. Chrome and Edge refuse that for any file under Program Files,
-where Battle.net installs the game by default, so the tab works only when the game is installed somewhere else. For a
-default install, this app would be the way to do both. Nothing is built yet. This is the plan.
+## Status
+
+On hold, and nothing is built yet. This repo is the plan.
+
+For now, the site does live logging in a browser tab, and plans to sync with the addon there too. Both need the
+browser to keep one of the game's files open. Chrome and Edge refuse that for any file under Program Files, where
+Battle.net installs the game by default, so the tab works only when the game is installed somewhere else. For a
+default install, this app would be the way to do both.
 
 ## What it would do
 
@@ -43,6 +47,11 @@ It uses the same API the browser tab uses for uploads and live logs, signed in w
 
 - Tauri (small, written in Rust) or Electron (larger, all JavaScript).
 - Windows first, or Windows and Mac together.
+
+## Problems and ideas
+
+Open an [issue](../../issues) here and pick "An idea", or use Feedback on any page of
+[guildgolem.com](https://guildgolem.com).
 
 ## Licence
 
