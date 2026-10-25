@@ -8,7 +8,7 @@ export interface PermissionAsk {
   requestingOrigin: string | undefined;
   /** The top page's address. Null when Electron has no page for the ask, as it does for file system access grants. */
   topUrl: string | null;
-  /** Set only for a frame embedded cross-origin. */
+  /** The origin of the page that holds the asking frame. Electron sets it on every check from a page, the site's own top page too. */
   embeddingOrigin?: string;
   isMainFrame?: boolean;
   filePath?: string;
@@ -21,7 +21,7 @@ export interface PermissionAsk {
  */
 export function decidePermission(ask: PermissionAsk, siteOrigin: string, fs?: FsLike): boolean {
   if (originOf(ask.requestingOrigin ?? "") !== siteOrigin) return false;
-  if (ask.embeddingOrigin !== undefined) return false;
+  if (ask.embeddingOrigin !== undefined && originOf(ask.embeddingOrigin) !== siteOrigin) return false;
   const topOk = ask.topUrl !== null && originOf(ask.topUrl) === siteOrigin;
   switch (ask.permission) {
     case "fileSystem":

@@ -43,6 +43,12 @@ describe("file system access", () => {
     assert.equal(decidePermission(grant({ embeddingOrigin: "https://evil.example" }), SITE, fs), false);
   });
 
+  test("the site's own page as the embedder is the site", () => {
+    // Electron sets embeddingOrigin on every check from a page, so the site's copy buttons see "granted".
+    assert.equal(decidePermission(grant({ embeddingOrigin: "https://guildgolem.com/" }), SITE, fs), true);
+    assert.equal(decidePermission({ permission: "clipboard-sanitized-write", requestingOrigin: "https://guildgolem.com/", topUrl: "https://guildgolem.com/g/x", embeddingOrigin: "https://guildgolem.com/" }, SITE, fs), true);
+  });
+
   test("writes only inside the addon's folder", () => {
     const write = (filePath?: string) => decidePermission(grant({ fileAccessType: "writable", filePath }), SITE, fs);
     assert.equal(write(`${addon}\\GuildGolem.lua`), true);

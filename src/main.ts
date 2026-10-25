@@ -107,9 +107,14 @@ function liftGameFolderBlock(ses: Session): void {
         pageUrl !== null &&
         originOf(pageUrl) === siteOrigin &&
         (frameUrl === null || originOf(frameUrl) === siteOrigin);
-      const decision = fromSite
-        ? decideAccess(details.origin, details.path, { origins: [siteOrigin] })
-        : { allow: false, reason: "not from the site's page" };
+      const rules = { origins: [siteOrigin] };
+      let decision = fromSite ? decideAccess(details.origin, details.path, rules) : { allow: false, reason: "not from the site's page" };
+      // A new file the site saves (the save picker) doesn't exist yet, so reading it can't be checked: it may be made
+      // inside the addon's folder alone, which is the write rule.
+      if (fromSite && !decision.allow && !details.isDirectory) {
+        const asWrite = decideAccess(details.origin, details.path, rules, "write");
+        if (asWrite.allow) decision = asWrite;
+      }
       if (decision.allow) answer = "allow";
       else if (fromSite) explainDenied();
       console.log(`file access ${answer}: ${decision.reason}`);
