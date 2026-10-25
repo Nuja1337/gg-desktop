@@ -1,5 +1,6 @@
 {
   "name": "gg-desktop",
+  "productName": "Guild Golem",
   "version": "0.1.0",
   "private": true,
   "description": "Guild Golem's desktop app: the site in a window that can read the game's folders under Program Files",
@@ -25,5 +26,36 @@
   },
   "allowScripts": {
     "electron-winstaller": false
+  },
+  "build": {
+    "appId": "com.guildgolem.desktop",
+    "productName": "Guild Golem",
+    "copyright": "Guild Golem",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/src/**/*",
+      "assets/icon.png",
+      "package.json"
+    ],
+    "artifactName": "Guild-Golem-Setup-${version}.${ext}",
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "Guild Golem"
+    }
   }
 }
