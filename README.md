@@ -32,21 +32,37 @@ When the site asks to open a file or folder that Chromium blocks, the app allows
 - The request comes from https://guildgolem.com. The dev build trusts https://dev.guildgolem.com instead.
 - The path, after every link and junction is resolved, is inside one of these folders of a game version:
   - `Logs`
-  - `WTF\Account\<account>\SavedVariables`
+  - `WTF\Account\SavedVariables`, `WTF\Account\<account>\SavedVariables` and
+    `WTF\Account\<account>\<realm>\<character>\SavedVariables`
   - `Interface\AddOns\GuildGolem`
 - The game version's folder (`_retail_`, `_classic_`, `_classic_beta_` and so on) is directly inside a folder named
   `World of Warcraft` and holds a `.flavor.info` file. A folder's name alone is not enough.
 
 It refuses everything else: other sites, a whole drive, the `World of Warcraft` folder itself, a game version's folder
 itself, the rest of the game's files, network (UNC) paths, paths with `..`, and a link in `Logs` that points
-somewhere else. The rule is in [src/allow.ts](src/allow.ts) and its tests are in [test](test).
+somewhere else. When the site asks for a folder it refuses, the app says which folders it opens. The rule is in
+[src/allow.ts](src/allow.ts) and its tests are in [test](test).
+
+Everything it opens is read-only, except the `Interface\AddOns\GuildGolem` folder, where the site may also write.
 
 The window itself is locked down:
 
 - It stays on the site and on Discord's sign-in pages. Any other link opens in your browser, if it is an https link,
   and never in the app.
 - It has no preload script and no Node access, and the page runs sandboxed.
-- It denies every page permission except file access.
+- It denies every page permission except file access and copying text to the clipboard. The page can't read the
+  clipboard.
+- The installed app turns off Electron's Node run mode, its Node environment variable and inspector arguments, and
+  loads its code only from its own archive (the asar file), which it checks against a stored hash.
+
+### One check turned off
+
+Chromium 156 also checks each file and folder inside a folder you have picked against its own block list, and it does
+this without asking the app. Under Program Files that makes a picked `Logs` folder look empty and its files
+unreadable. So the app turns off two of these checks, `FileSystemAccessDirectoryIterationBlocklistCheck` and
+`FileSystemAccessWriteBlocklistCheck`. The cost: if someone plants a link or junction inside a folder you already
+picked, and it points somewhere else, Chromium no longer catches it. Only someone who can already write to your game's
+folders can plant one. The rule above still decides which folders the site can pick in the first place.
 
 ## Run it from source
 
@@ -59,9 +75,10 @@ npm start
 ```
 
 `npm start` opens the live site. `npm run start:dev` opens https://dev.guildgolem.com, with its own sign-in storage.
-Setting `GG_DESKTOP_DEV=1` does the same as the dev script. `npm run build` compiles to `dist`, and `npm run dist`
-makes the Windows installer in `release`. The workflow in `.github/workflows/build.yml` runs the tests and builds the
-installer on every push, and keeps it as a download on the run.
+Setting `GG_DESKTOP_DEV=1` does the same as the dev script. Dev mode works only when run from source: an installed app
+always loads the live site. `npm run build` compiles to `dist`, and `npm run dist` makes the Windows installer in
+`release`. The workflow in `.github/workflows/build.yml` runs the tests and builds the installer on every push and pull
+request, and keeps the installer as a download on the run for pushes to main and for tags.
 
 ## Planned
 
