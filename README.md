@@ -53,6 +53,7 @@ It uses the same API the browser tab uses for uploads and live logs, signed in w
 Open an [issue](../../issues) here and pick "An idea", or use Feedback on any page of
 [guildgolem.com](https://guildgolem.com).
 
-## Licence
+## License
 
-There's no licence yet, so all rights are reserved.
+All rights reserved. The app is free to download and use for your own raids, and you may read and change its code
+for yourself. You may not redistribute it. The full terms are in [LICENSE](LICENSE).
