@@ -4,17 +4,69 @@ A small desktop app for [Guild Golem](https://guildgolem.com), a guild managemen
 
 ## Status
 
-On hold, and nothing is built yet. This repo is the plan.
+Version 1 is built. It is an unsigned beta, so Windows will warn before it installs. Windows only.
 
-For now, the site does live logging in a browser tab, and plans to sync with the addon there too. Both need the
-browser to keep one of the game's files open. Chrome and Edge refuse that for any file under Program Files, where
-Battle.net installs the game by default, so the tab works only when the game is installed somewhere else. For a
-default install, this app would be the way to do both.
+The site does live logging in a browser tab, and plans to sync with the addon there too. Both need the browser to keep
+one of the game's files open. Chrome and Edge refuse that for any file under Program Files, where Battle.net installs
+the game by default, so the tab works only when the game is installed somewhere else. This app is the fix for a
+default install.
 
-## What it would do
+## What it does
 
-It would do what the browser tab does, without a tab left open and wherever the game is installed, plus a few things
-a web page can't:
+It is the site, https://guildgolem.com, in its own window. It loads the live site, so each site update reaches the app
+without a new install, and the site's own Go live card works as it does in a browser. The app has no copy of the log
+parser, no server API of its own and no separate sign-in. You sign in with Discord on the site.
+
+The one change from a browser is that it lifts Chromium's block on Program Files for the game's own folders. It also:
+
+- Keeps running when you close the window. The tray icon has Open and Quit, and Quit asks first if the site says a live
+  log is running.
+- Keeps reading while the window is hidden, since a raid runs for hours.
+- Runs one copy. Starting it again brings the open window forward.
+- Keeps your Discord sign-in in its own storage, apart from your browser's.
+
+## What it allows and refuses
+
+When the site asks to open a file or folder that Chromium blocks, the app allows it only when all of these hold:
+
+- The request comes from https://guildgolem.com. The dev build trusts https://dev.guildgolem.com instead.
+- The path, after every link and junction is resolved, is inside one of these folders of a game version:
+  - `Logs`
+  - `WTF\Account\<account>\SavedVariables`
+  - `Interface\AddOns\GuildGolem`
+- The game version's folder (`_retail_`, `_classic_`, `_classic_beta_` and so on) is directly inside a folder named
+  `World of Warcraft` and holds a `.flavor.info` file. A folder's name alone is not enough.
+
+It refuses everything else: other sites, a whole drive, the `World of Warcraft` folder itself, a game version's folder
+itself, the rest of the game's files, network (UNC) paths, paths with `..`, and a link in `Logs` that points
+somewhere else. The rule is in [src/allow.ts](src/allow.ts) and its tests are in [test](test).
+
+The window itself is locked down:
+
+- It stays on the site and on Discord's sign-in pages. Any other link opens in your browser, if it is an https link,
+  and never in the app.
+- It has no preload script and no Node access, and the page runs sandboxed.
+- It denies every page permission except file access.
+
+## Run it from source
+
+You need Node 22 or newer. Then:
+
+```
+npm install
+npm test
+npm start
+```
+
+`npm start` opens the live site. `npm run start:dev` opens https://dev.guildgolem.com, with its own sign-in storage.
+Setting `GG_DESKTOP_DEV=1` does the same as the dev script. `npm run build` compiles to `dist`, and `npm run dist`
+makes the Windows installer in `release`. The workflow in `.github/workflows/build.yml` runs the tests and builds the
+installer on every push, and keeps it as a download on the run.
+
+## Planned
+
+Version 1 does what the browser tab does, without a tab left open and wherever the game is installed. These are next,
+and none of them is built:
 
 | Feature | What it means for a raider |
 |---|---|
@@ -34,8 +86,8 @@ memory, automating input or drawing over the game would break Blizzard's rules, 
 
 ## How it talks to the site
 
-It uses the same API the browser tab uses for uploads and live logs, signed in with the player's Guild Golem account
-(through Discord). It doesn't keep a copy of a log after sending it.
+It is the site. Uploads and live logs use the same API and the same Discord sign-in as the browser tab. It doesn't keep
+a copy of a log after sending it.
 
 ## Costs
 
@@ -45,8 +97,8 @@ It uses the same API the browser tab uses for uploads and live logs, signed in w
 
 ## Still to decide
 
-- Tauri (small, written in Rust) or Electron (larger, all JavaScript).
-- Windows first, or Windows and Mac together.
+- Whether to sign the Windows installer before the first release.
+- Whether to make a Mac version.
 
 ## Problems and ideas
 
