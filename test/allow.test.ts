@@ -50,6 +50,10 @@ describe("paths inside the allowed folders (Windows rules)", () => {
     `${WOW}\\_retail_\\Interface\\AddOns\\GuildGolem`,
     `${WOW}\\_retail_\\Interface\\AddOns\\GuildGolem\\GuildGolem.toc`,
     "D:\\Games\\World of Warcraft\\_retail_\\Logs\\WoWCombatLog.txt",
+    `${WOW}\\_retail_\\WTF\\Account\\SavedVariables`,
+    `${WOW}\\_retail_\\WTF\\Account\\SavedVariables\\Other.lua`,
+    `${WOW}\\_retail_\\WTF\\Account\\ACC\\Realm\\Char\\SavedVariables`,
+    `${WOW}\\_retail_\\WTF\\Account\\ACC\\Realm\\Char\\SavedVariables\\GuildGolem.lua`,
   ];
   for (const p of ok) {
     test(`allows ${p}`, () => {
@@ -70,6 +74,9 @@ describe("paths outside the allowed folders", () => {
     `${WOW}\\_retail_\\WTF\\Account\\ACC`,
     `${WOW}\\_retail_\\WTF\\Account\\ACC\\SavedVariables\\..\\config.wtf`,
     `${WOW}\\_retail_\\WTF\\Account\\ACC\\config-cache.wtf`,
+    `${WOW}\\_retail_\\WTF\\Account\\ACC\\Realm\\Char`,
+    `${WOW}\\_retail_\\WTF\\Account\\ACC\\Realm\\Char\\chat-cache.txt`,
+    `${WOW}\\_retail_\\WTF\\Account\\ACC\\Realm\\Char\\Sub\\SavedVariables`,
     `${WOW}\\_retail_\\WTF\\Config.wtf`,
     `${WOW}\\_retail_\\Interface`,
     `${WOW}\\_retail_\\Interface\\AddOns`,
@@ -114,6 +121,20 @@ describe("the flavor folder", () => {
 
 describe("origin", () => {
   const p = `${WOW}\\_retail_\\Logs\\WoWCombatLog.txt`;
+  test("Electron's form, with a trailing slash, and the bare form both work", () => {
+    assert.equal(decide(p, undefined, "https://guildgolem.com/").allow, true);
+    assert.equal(decide(p, undefined, "https://guildgolem.com").allow, true);
+  });
+  test("a trailing slash doesn't make another origin match", () => {
+    for (const origin of [
+      "https://evil.example/",
+      "http://guildgolem.com/",
+      "https://guildgolem.com.evil.example/",
+      "https://dev.guildgolem.com/",
+    ]) {
+      assert.equal(decide(p, undefined, origin).allow, false, origin);
+    }
+  });
   test("another origin is refused", () => {
     for (const origin of [
       "https://evil.example",
@@ -135,6 +156,44 @@ describe("origin", () => {
     const cfg = win(fakeWindows([retailMarker]), ["https://dev.guildgolem.com"]);
     assert.equal(decideAccess("https://dev.guildgolem.com", p, cfg).allow, true);
     assert.equal(decideAccess(SITE, p, cfg).allow, false);
+  });
+});
+
+describe("write access", () => {
+  const addon = `${WOW}\\_retail_\\Interface\\AddOns\\GuildGolem`;
+  const w = (p: string, fs: FsLike = fakeWindows([retailMarker])) => decideAccess(`${SITE}/`, p, win(fs), "write");
+  const missingLeaf = (base: FsLike, leaf: string): FsLike => ({
+    ...base,
+    realpath: (p) => {
+      if (p.toLowerCase().endsWith(leaf)) throw new Error("ENOENT");
+      return base.realpath(p);
+    },
+  });
+
+  test("only the addon's folder is writable", () => {
+    assert.equal(w(addon).allow, true);
+    assert.equal(w(`${addon}\\GuildGolem.lua`).allow, true);
+    assert.equal(decide(addon).writable, true);
+    assert.equal(decide(`${WOW}\\_retail_\\Logs\\WoWCombatLog.txt`).writable, false);
+  });
+
+  test("Logs and SavedVariables are read-only", () => {
+    assert.equal(w(`${WOW}\\_retail_\\Logs\\WoWCombatLog.txt`).allow, false);
+    assert.equal(w(`${WOW}\\_retail_\\WTF\\Account\\ACC\\SavedVariables\\GuildGolem.lua`).allow, false);
+    assert.equal(w(`${WOW}\\_retail_\\WTF\\Account\\SavedVariables`).allow, false);
+    assert.equal(w("C:\\Users\\Me\\Documents\\x.txt").allow, false);
+  });
+
+  test("a file that doesn't exist yet counts by its folder", () => {
+    const missing = missingLeaf(fakeWindows([retailMarker]), "new.lua");
+    assert.equal(w(`${addon}\\new.lua`, missing).allow, true);
+    assert.equal(w(`${WOW}\\_retail_\\Logs\\new.lua`, missing).allow, false);
+    assert.equal(decideAccess(SITE, `${addon}\\new.lua`, win(missing)).allow, false, "a missing file is not a read");
+  });
+
+  test("a new file in a folder that is a link out is refused", () => {
+    const base = fakeWindows([retailMarker], { [addon]: "C:\\Windows\\System32" });
+    assert.equal(w(`${addon}\\evil.dll`, missingLeaf(base, "evil.dll")).allow, false);
   });
 });
 

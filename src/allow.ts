@@ -2,12 +2,16 @@
 // the page picks a file or folder under a path Chromium refuses (Program Files), and answers allow or deny from it.
 //
 // Allowed, and nothing else: a request from an origin on the list, for a path that resolves to the inside of
-//   <...>\World of Warcraft\<flavor>\Logs
-//   <...>\World of Warcraft\<flavor>\WTF\Account\<any>\SavedVariables
-//   <...>\World of Warcraft\<flavor>\Interface\AddOns\GuildGolem
+//   <...>\World of Warcraft\<flavor>\Logs                                          (read)
+//   <...>\World of Warcraft\<flavor>\WTF\Account\SavedVariables                    (read)
+//   <...>\World of Warcraft\<flavor>\WTF\Account\<any>\SavedVariables              (read)
+//   <...>\World of Warcraft\<flavor>\WTF\Account\<any>\<realm>\<char>\SavedVariables (read)
+//   <...>\World of Warcraft\<flavor>\Interface\AddOns\GuildGolem                   (read and write)
 // where <flavor> is a folder directly inside a "World of Warcraft" folder that holds a ".flavor.info" file. The folder's
 // name alone is never enough.
 import * as nodeFs from "node:fs";
+import * as nodePath from "node:path";
+import { originOf } from "./navigation";
 
 export interface FsLike {
   /** The final path with every link, junction and 8.3 name resolved. Throws if the path doesn't exist. */
@@ -28,7 +32,7 @@ export const realFs: FsLike = {
 };
 
 export interface AllowConfig {
-  /** Exact origins that may use the rule, such as "https://guildgolem.com". */
+  /** Origins that may use the rule, such as "https://guildgolem.com". They are compared as origins, so a slash is fine. */
   origins: readonly string[];
   /** Defaults to this machine's. Windows paths are compared without regard to case. */
   platform?: NodeJS.Platform;
@@ -38,17 +42,27 @@ export interface AllowConfig {
 export interface Decision {
   allow: boolean;
   reason: string;
+  /** True only inside the addon's own folder. Everything else the app opens is read-only. */
+  writable: boolean;
 }
+
+export type Access = "read" | "write";
 
 export const WOW_FOLDER = "World of Warcraft";
 export const FLAVOR_MARKER = ".flavor.info";
 export const ADDON_FOLDER = "GuildGolem";
 
-const deny = (reason: string): Decision => ({ allow: false, reason });
-const allow = (reason: string): Decision => ({ allow: true, reason });
+const deny = (reason: string): Decision => ({ allow: false, reason, writable: false });
+const allow = (reason: string, writable = false): Decision => ({ allow: true, reason, writable });
 
+/**
+ * Compares as origins. Electron reports the requesting origin as a URL spec with a trailing slash
+ * ("https://guildgolem.com/"), while a page's origin has none.
+ */
 export function isAllowedOrigin(origin: unknown, origins: readonly string[]): boolean {
-  return typeof origin === "string" && origins.includes(origin);
+  if (typeof origin !== "string") return false;
+  const o = originOf(origin);
+  return o !== null && origins.some((x) => originOf(x) === o);
 }
 
 interface Parsed {
@@ -104,17 +118,43 @@ export function checkResolvedPath(real: string, config: Pick<AllowConfig, "platf
     if (!fs.isFile(flavorDir + sep + FLAVOR_MARKER)) continue;
     const t = segments.slice(i + 1);
     if (is(t[0], "Logs")) return allow("Logs");
-    if (is(t[0], "WTF") && is(t[1], "Account") && t[2] !== undefined && is(t[3], "SavedVariables")) {
-      return allow("SavedVariables");
+    if (is(t[0], "WTF") && is(t[1], "Account")) {
+      // Account-wide, per account, and per character. The folder names in between can be anything.
+      const saved =
+        is(t[2], "SavedVariables") ||
+        (t[2] !== undefined && is(t[3], "SavedVariables")) ||
+        (t[2] !== undefined && t[3] !== undefined && t[4] !== undefined && is(t[5], "SavedVariables"));
+      if (saved) return allow("SavedVariables");
     }
-    if (is(t[0], "Interface") && is(t[1], "AddOns") && is(t[2], ADDON_FOLDER)) return allow("the addon folder");
+    if (is(t[0], "Interface") && is(t[1], "AddOns") && is(t[2], ADDON_FOLDER)) return allow("the addon folder", true);
     return deny("inside a game folder, but not Logs, SavedVariables or the addon");
   }
   return deny("not inside a game flavor folder");
 }
 
-/** The whole rule: origin, then the raw path, then the resolved path. */
-export function decideAccess(origin: unknown, requestedPath: unknown, config: AllowConfig): Decision {
+/** The final path, or for a file that doesn't exist yet, its folder's final path plus the file's name. */
+function resolveForWrite(p: string, platform: NodeJS.Platform, fs: FsLike): string {
+  try {
+    return fs.realpath(p);
+  } catch {
+    const lib = platform === "win32" ? nodePath.win32 : nodePath.posix;
+    const trimmed = p.replace(/[\\/]+$/, "");
+    const name = lib.basename(trimmed);
+    if (!name) throw new Error("no name");
+    return lib.join(fs.realpath(lib.dirname(trimmed)), name);
+  }
+}
+
+/**
+ * The whole rule: origin, then the raw path, then the resolved path. With "write" it allows only the addon's folder,
+ * and a file that doesn't exist yet counts by where it would be made.
+ */
+export function decideAccess(
+  origin: unknown,
+  requestedPath: unknown,
+  config: AllowConfig,
+  access: Access = "read",
+): Decision {
   const platform = config.platform ?? process.platform;
   const fs = config.fs ?? realFs;
   if (!isAllowedOrigin(origin, config.origins)) return deny("origin not allowed");
@@ -122,9 +162,12 @@ export function decideAccess(origin: unknown, requestedPath: unknown, config: Al
   if (bad) return deny(bad);
   let real: string;
   try {
-    real = fs.realpath(requestedPath as string);
+    const p = requestedPath as string;
+    real = access === "write" ? resolveForWrite(p, platform, fs) : fs.realpath(p);
   } catch {
     return deny("path can't be resolved");
   }
-  return checkResolvedPath(real, { platform, fs });
+  const decision = checkResolvedPath(real, { platform, fs });
+  if (access === "write" && decision.allow && !decision.writable) return deny("read-only folder");
+  return decision;
 }

@@ -5,12 +5,23 @@ import type { Session, WebContents } from "electron";
 import * as path from "node:path";
 import { decideAccess } from "./allow";
 import { DEV_SITE_ORIGIN, SITE_ORIGIN, isExternalOk, isInAppUrl, originOf } from "./navigation";
+import { decidePermission } from "./permissions";
 
-// `npm run start:dev`, or GG_DESKTOP_DEV=1, loads the dev site and trusts that origin instead of the live one.
-const isDev = process.argv.includes("--dev") || process.env.GG_DESKTOP_DEV === "1";
+// `npm run start:dev`, or GG_DESKTOP_DEV=1, loads the dev site and trusts that origin instead of the live one. It
+// works only when run from source: an installed app always loads the live site.
+const isDev = !app.isPackaged && (process.argv.includes("--dev") || process.env.GG_DESKTOP_DEV === "1");
 const siteOrigin = isDev ? DEV_SITE_ORIGIN : SITE_ORIGIN;
 const title = isDev ? "Guild Golem (dev)" : "Guild Golem";
 const iconPath = path.join(__dirname, "..", "..", "assets", "icon.png");
+
+// Chromium 156 checks every child of a picked folder against its block list too: it lists no files, and opens no
+// child, of a folder under Program Files, and it doesn't ask this app first. These two checks are turned off, so a
+// picked Logs folder can be read. The restricted-path rule below still decides what the site may pick. The cost: when
+// a link or junction is planted inside a folder the user already picked and points somewhere else, Chromium no longer
+// catches it. Only someone who can already write to the game's folders can plant one.
+const OFF = ["FileSystemAccessDirectoryIterationBlocklistCheck", "FileSystemAccessWriteBlocklistCheck"];
+const already = app.commandLine.getSwitchValue("disable-features").split(",").filter(Boolean);
+app.commandLine.appendSwitch("disable-features", [...new Set([...already, ...OFF])].join(","));
 
 // The dev app keeps its own sign-in, so the two sites' sessions never mix.
 if (isDev) app.setPath("userData", path.join(app.getPath("appData"), title));
@@ -33,15 +44,54 @@ function openInBrowser(url: string): void {
   else console.warn("Blocked a link that is not https:", url.slice(0, 80));
 }
 
-/** Allow only the file system permission, and only for the site. The page's other requests are refused. */
+/**
+ * File system access for the site (writes only in the addon's folder), and clipboard text written from the site's page.
+ * The rest is refused. With a check handler set, Electron sends every file grant here with no page, so the origin
+ * decides, as the request handler's page check can't.
+ */
 function lockPermissions(ses: Session): void {
-  const ok = (permission: string, origin: string) => permission === "fileSystem" && origin === siteOrigin;
   ses.setPermissionRequestHandler((contents, permission, callback, details) => {
-    callback(ok(permission, originOf(details.requestingUrl) ?? "") && originOf(contents.getURL()) === siteOrigin);
+    const d = details as { requestingUrl?: string; embeddingOrigin?: string; isMainFrame?: boolean; filePath?: string; fileAccessType?: "writable" | "readable" };
+    callback(
+      decidePermission(
+        { permission, requestingOrigin: d.requestingUrl, topUrl: contents.getURL(), embeddingOrigin: d.embeddingOrigin, isMainFrame: d.isMainFrame, filePath: d.filePath, fileAccessType: d.fileAccessType },
+        siteOrigin,
+      ),
+    );
   });
-  ses.setPermissionCheckHandler((contents, permission, requestingOrigin) => {
-    return ok(permission, requestingOrigin) && (!contents || originOf(contents.getURL()) === siteOrigin);
+  ses.setPermissionCheckHandler((contents, permission, requestingOrigin, details) => {
+    return decidePermission(
+      { permission, requestingOrigin, topUrl: contents ? contents.getURL() : null, embeddingOrigin: details.embeddingOrigin, isMainFrame: details.isMainFrame, filePath: details.filePath, fileAccessType: details.fileAccessType },
+      siteOrigin,
+    );
   });
+}
+
+const DENIED_DETAIL = [
+  "Under Program Files, the app opens only these folders of a game version, such as _retail_ or _classic_:",
+  "",
+  "Logs",
+  "WTF\\Account\\...\\SavedVariables",
+  "Interface\\AddOns\\GuildGolem",
+  "",
+  "Pick one of them, or a file inside one.",
+].join("\n");
+
+let explaining = false;
+/** Says, in a native box, which folders the app opens, so a refused pick isn't a silent failure. One box at a time. */
+function explainDenied(): void {
+  if (explaining || !win) return;
+  explaining = true;
+  void dialog
+    .showMessageBox(win, {
+      type: "info",
+      title,
+      message: "Guild Golem can't open that folder",
+      detail: DENIED_DETAIL,
+    })
+    .finally(() => {
+      explaining = false;
+    });
 }
 
 /** The block on Program Files: ask allow.ts, and refuse anything it doesn't clearly allow. */
@@ -53,7 +103,7 @@ function liftGameFolderBlock(ses: Session): void {
       const frameUrl = details.frame ? details.frame.url : null;
       const pageUrl = details.webContents ? details.webContents.getURL() : null;
       const fromSite =
-        details.origin === siteOrigin &&
+        originOf(details.origin) === siteOrigin &&
         pageUrl !== null &&
         originOf(pageUrl) === siteOrigin &&
         (frameUrl === null || originOf(frameUrl) === siteOrigin);
@@ -61,6 +111,7 @@ function liftGameFolderBlock(ses: Session): void {
         ? decideAccess(details.origin, details.path, { origins: [siteOrigin] })
         : { allow: false, reason: "not from the site's page" };
       if (decision.allow) answer = "allow";
+      else if (fromSite) explainDenied();
       console.log(`file access ${answer}: ${decision.reason}`);
     } catch (err) {
       console.error("file access check failed, denied:", err);
