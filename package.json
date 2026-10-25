@@ -56,6 +56,15 @@
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "shortcutName": "Guild Golem"
+    },
+    "electronFuses": {
+      "runAsNode": false,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableCookieEncryption": true,
+      "onlyLoadAppFromAsar": true,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "grantFileProtocolExtraPrivileges": false
     }
   }
 }
