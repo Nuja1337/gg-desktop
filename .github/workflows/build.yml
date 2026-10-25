@@ -1,5 +1,5 @@
-# Builds the Windows installer on every push and pull request, after the allow tests pass, and keeps it as a workflow
-# artifact. The installer is unsigned for now. It never publishes a release.
+# Builds the Windows installer on every push and pull request, after the tests pass. It keeps the installer as a workflow
+# artifact for pushes to main and tags only. The installer is unsigned for now. It never publishes a release.
 name: Build
 
 on:
@@ -17,6 +17,8 @@ jobs:
     # tag points to.
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -29,7 +31,9 @@ jobs:
 
       - run: npm run dist
 
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      # Pull requests build and test, but keep no installer. Only main and tags do.
+      - if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: guild-golem-installer
           path: release/Guild-Golem-Setup-*.exe
